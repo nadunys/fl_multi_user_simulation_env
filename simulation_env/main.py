@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
 
-from dataset import prepare_dataset
+from dataset import get_dataset
 from client import generate_client_fn
 from server import get_on_fit_config, get_evaluate_fn
 
@@ -41,9 +41,7 @@ def main(cfg: DictConfig):
     # in our config -- but you can change this!) following a independent and identically distributed (IID)
     # sampling mechanism. This is arguably the simples way of partitioning data but it's a good fit
     # for this introductory tutorial.
-    trainloaders, validationloaders, testloader = prepare_dataset(
-        cfg.num_clients, cfg.batch_size
-    )
+    train, test, validation = get_dataset()
 
     ## 3. Define your clients
     # Unlike in standard FL (e.g. see the quickstart-pytorch or quickstart-tensorflow examples in the Flower repo),
