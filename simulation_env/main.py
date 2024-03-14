@@ -17,30 +17,15 @@ from server import get_on_fit_config, get_evaluate_fn
 def main(cfg: DictConfig):
     ## 1. Parse config & get experiment output dir
     print(OmegaConf.to_yaml(cfg))
-    # Hydra automatically creates a directory for your experiments
-    # by default it would be in <this directory>/outputs/<date>/<time>
-    # you can retrieve the path to it as shown below. We'll use this path to
-    # save the results of the simulation (see the last part of this main())
     save_path = HydraConfig.get().runtime.output_dir
 
     ## 2. Prepare your dataset
-    # When simulating FL runs we have a lot of freedom on how the FL clients behave,
-    # what data they have, how much data, etc. This is not possible in real FL settings.
-    # In simulation you'd often encounter two types of dataset:
-    #       * naturally partitioned, that come pre-partitioned by user id (e.g. FEMNIST,
-    #         Shakespeare, SpeechCommands) and as a result these dataset have a fixed number
-    #         of clients and a fixed amount/distribution of data for each client.
-    #       * and others that are not partitioned in any way but are very popular in ML
-    #         (e.g. MNIST, CIFAR-10/100). We can _synthetically_ partition these datasets
-    #         into an arbitrary number of partitions and assign one to a different client.
-    #         Synthetically partitioned dataset allow for simulating different data distribution
-    #         scenarios to tests your ideas. The down side is that these might not reflect well
-    #         the type of distributions encounter in the Wild.
-    #
-    # In this tutorial we are going to partition the MNIST dataset into 100 clients (the default
-    # in our config -- but you can change this!) following a independent and identically distributed (IID)
-    # sampling mechanism. This is arguably the simples way of partitioning data but it's a good fit
-    # for this introductory tutorial.
+    # data will be in the format of 
+    # User {
+    #     user: number
+    #     text: string
+    # }
+    # there will be multiple data from each user 
     train, test, validation = get_dataset()
 
     ## 3. Define your clients

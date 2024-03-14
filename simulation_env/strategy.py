@@ -152,4 +152,4 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         global_weights_results.append((parameters_to_ndarrays(r.parameters), r.num_examples))
 
                     if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                        input_shape = sequaance_len
+                        input_shape = (seq_len, input_dim)
