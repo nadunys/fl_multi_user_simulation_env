@@ -64,7 +64,7 @@ class FlowerClient(fl.client.NumPyClient):
         return float(loss), len(self.valloader), {"accuracy": accuracy}
 
 
-def generate_client_fn(trainloaders, valloaders, num_classes):
+def generate_client_fn(trainloaders, valloaders):
     """Return a function that can be used by the VirtualClientEngine.
 
     to spawn a FlowerClient with client id `cid`.
@@ -80,7 +80,6 @@ def generate_client_fn(trainloaders, valloaders, num_classes):
         return FlowerClient(
             trainloader=trainloaders[int(cid)],
             vallodaer=valloaders[int(cid)],
-            num_classes=num_classes,
         ).to_client()
 
     # return the function to spawn client

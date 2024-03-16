@@ -1,35 +1,40 @@
 from typing import Dict, List, Tuple, Union, Optional
 import flwr as fl
 import json
+import numpy as np
 
 from flwr.server.client_proxy import ClientProxy
 
 from init_devices import get_device_parameters
 from device_selection import Device, compute_metrics, select_devices_UAC
+from model import LSTM
 
-from flwr.common import FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays
+from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays
 from flwr.server.client_manager import ClientManager
 from logging import DEBUG, INFO
 from flwr.common.logger import log
-from types import Dict
 
-devices_list = []
+devices_list = ['laptop', 'mobile_phone', 'smart_watch']
+user_list = set()
 device_selection = "overall"
 sample_device_per = 0.5
 user_model_path = './checkpoints'
 seq_len = 10
 input_dim = 100
 WAIT_TIMEOUT = 600
+SEED = 42
+
+np.random.seed(SEED)
 
 class PersonalizationStrategy(fl.server.strategy.FedAvg):
     def __init__(
             self,
             fraction_fit: float = 0.1,
-            fraction_eval: float = 0.1,
+            fraction_evaluate: float = 0.1,
             min_fit_clients: int = 1,
-            min_eval_clients: int = 1,
+            min_evaluate_clients: int = 1,
             min_available_clients: int = 1,
-            eval_fn = None,
+            evaluate_fn = None,
             on_fit_config_fn = None,
             on_evaluate_config_fn = None,
             initial_parameters = None,
@@ -37,11 +42,11 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
     ) -> None:
         super().__init__(
             fraction_fit=fraction_fit,
-            fraction_eval=fraction_eval,
+            fraction_evaluate=fraction_evaluate,
             min_fit_clients=min_fit_clients,
-            min_eval_clients=min_eval_clients,
+            min_evaluate_clients=min_evaluate_clients,
             min_available_clients=min_available_clients,
-            eval_fn=eval_fn,
+            evaluate_fn=evaluate_fn,
             on_fit_config_fn=on_fit_config_fn,
             on_evaluate_config_fn=on_evaluate_config_fn,
             initial_parameters=initial_parameters
@@ -153,3 +158,51 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
 
                     if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
                         input_shape = (seq_len, input_dim)
+                        user_model = LSTM()
+
+                    devices = devices_list
+                    params_by_user = {u: [] for u in list(user_list)}
+                    # TODO: load user, device and set weights
+
+        except Exception as e:
+            print('Something went wrong with aggregrate fit')
+            print(e)
+            exit()
+
+    def aggregate_evaluate(
+            self,
+            server_round:int, 
+            results, 
+            failures: List[BaseException]):
+        global device_accuracies, user_accuracies
+        try:
+            if not results:
+                return None
+            
+            # accuracy of each client
+            accuracies = []
+            examples = []
+            losses = []
+
+            # global model accurary and loss
+            aggregated_accuracy = sum(accuracies) / sum(examples)
+            aggergated_los = np.mean(losses)
+
+            print(f'For round: {server_round} aggregated accuracy is: {aggregated_accuracy}')
+
+            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
+                # create user and device weighted accuracy and loss
+                print('create user and device weighted accuracies')
+            
+            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
+                # write round results with user results
+                print('write round aand user results')
+            else:
+                # write only round results
+                print('write only round results')
+
+        except Exception as e:
+            print('Something went wrong in aggregate evaluate')
+            print(e)
+        
+        return super().aggregate_evaluate(server_round, results, failures)

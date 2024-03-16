@@ -9,7 +9,8 @@ import flwr as fl
 
 from dataset import get_dataset
 from client import generate_client_fn
-from server import get_on_fit_config, get_evaluate_fn
+from server import get_on_fit_config, get_on_evaluate_config
+from strategy import PersonalizationStrategy
 
 
 # A decorator for Hydra. This tells hydra to by default load the config in conf/base.yaml
@@ -29,35 +30,19 @@ def main(cfg: DictConfig):
     train, test, validation = get_dataset()
 
     ## 3. Define your clients
-    # Unlike in standard FL (e.g. see the quickstart-pytorch or quickstart-tensorflow examples in the Flower repo),
-    # in simulation we don't want to manually launch clients. We delegate that to the VirtualClientEngine.
-    # What we need to provide to start_simulation() with is a function that can be called at any point in time to
-    # create a client. This is what the line below exactly returns.
-    client_fn = generate_client_fn(trainloaders, validationloaders, cfg.num_classes)
+    client_fn = generate_client_fn(train, validation)
 
     ## 4. Define your strategy
-    # A flower strategy orchestrates your FL pipeline. Although it is present in all stages of the FL process
-    # each strategy often differs from others depending on how the model _aggregation_ is performed. This happens
-    # in the strategy's `aggregate_fit()` method. In this tutorial we choose FedAvg, which simply takes the average
-    # of the models received from the clients that participated in a FL round doing fit().
-    # You can implement a custom strategy to have full control on all aspects including: how the clients are sampled,
-    # how updated models from the clients are aggregated, how the model is evaluated on the server, etc
-    # To control how many clients are sampled, strategies often use a combination of two parameters `fraction_{}` and `min_{}_clients`
-    # where `{}` can be either `fit` or `evaluate`, depending on the FL stage. The final number of clients sampled is given by the formula
-    # ``` # an equivalent bit of code is used by the strategies' num_fit_clients() and num_evaluate_clients() built-in methods.
-    #         num_clients = int(num_available_clients * self.fraction_fit)
-    #         clients_to_do_fit = max(num_clients, self.min_fit_clients)
-    # ```
-    strategy = fl.server.strategy.FedAvg(
-        fraction_fit=0.0,  # in simulation, since all clients are available at all times, we can just use `min_fit_clients` to control exactly how many clients we want to involve during fit
+    strategy = PersonalizationStrategy(
+        fraction_fit=1.0,  # in simulation, since all clients are available at all times, we can just use `min_fit_clients` to control exactly how many clients we want to involve during fit
+        fraction_evaluate=1.0,  # similar to fraction_fit, we don't need to use this argument.
         min_fit_clients=cfg.num_clients_per_round_fit,  # number of clients to sample for fit()
-        fraction_evaluate=0.0,  # similar to fraction_fit, we don't need to use this argument.
         min_evaluate_clients=cfg.num_clients_per_round_eval,  # number of clients to sample for evaluate()
         min_available_clients=cfg.num_clients,  # total clients in the simulation
-        on_fit_config_fn=get_on_fit_config(
-            cfg.config_fit
-        ),  # a function to execute to obtain the configuration to send to the clients during fit()
-        evaluate_fn=get_evaluate_fn(cfg.num_classes, testloader),
+        on_fit_config_fn=get_on_fit_config(cfg.config_fit), # a function to execute to obtain the configuration to send to the clients during fit()
+        on_evaluate_config_fn=get_on_evaluate_config(cfg.config_evaluate),
+        # initial_parameters=
+        num_clients=cfg.num_clients
     )  # a function to run on the server side to evaluate the global model.
 
     ## 5. Start Simulation
@@ -65,18 +50,11 @@ def main(cfg: DictConfig):
     history = fl.simulation.start_simulation(
         client_fn=client_fn,  # a function that spawns a particular client
         num_clients=cfg.num_clients,  # total number of clients
+        strategy=strategy,  # our strategy of choice
+        client_resources={"num_cpus": 2, "num_gpus": 0.0},  # (optional) controls the degree of parallelism of your simulation.
         config=fl.server.ServerConfig(
             num_rounds=cfg.num_rounds
         ),  # minimal config for the server loop telling the number of rounds in FL
-        strategy=strategy,  # our strategy of choice
-        client_resources={
-            "num_cpus": 2,
-            "num_gpus": 0.0,
-        },  # (optional) controls the degree of parallelism of your simulation.
-        # Lower resources per client allow for more clients to run concurrently
-        # (but need to be set taking into account the compute/memory footprint of your run)
-        # `num_cpus` is an absolute number (integer) indicating the number of threads a client should be allocated
-        # `num_gpus` is a ratio indicating the portion of gpu memory that a client needs.
     )
 
     # ^ Following the above comment about `client_resources`. if you set `num_gpus` to 0.5 and you have one GPU in your system,
