@@ -35,6 +35,6 @@ def test(model, test_loader, criterion):
             outputs = model(inputs)
             loss = criterion(outputs.view(-1, outputs.size(2)), targets.view(-1))
             running_loss += loss.item()
-    print(f"Test Loss: {running_loss / len(test_loader)}")
+    return running_loss / len(test_loader)
 
 
