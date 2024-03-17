@@ -30,7 +30,7 @@ def main(cfg: DictConfig):
     train, test, validation = get_dataset()
 
     ## 3. Define your clients
-    client_fn = generate_client_fn(train, validation)
+    client_fn = generate_client_fn(train.values)
 
     ## 4. Define your strategy
     strategy = PersonalizationStrategy(

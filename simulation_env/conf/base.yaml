@@ -13,8 +13,7 @@ num_clients_per_round_fit: 10 # number of clients to involve in each fit round (
 num_clients_per_round_eval: 25 # number of clients to involve in each evaluate round (evaluate round = client only evaluate the model sent by the server on their local dataset without training it)
 config_fit: # a config that each client will receive (this is send by the server) when they are sampled. This allows you to dynamically configure the training on the client side as the simulation progresses
   lr: 0.01 # learning rate to use by the clients
-  momentum: 0.9 # momentum used by SGD optimiser on the client side
-  local_epochs: 1 # number of training epochs each clients does in a fit() round
+  local_epochs: 10 # number of training epochs each clients does in a fit() round
   batch_size: 20
 config_evaluate:
   val_steps: 5

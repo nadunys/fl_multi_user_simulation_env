@@ -1,16 +1,24 @@
 from collections import OrderedDict
 from typing import Dict, Tuple
 from flwr.common import NDArrays, Scalar
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
 
 import torch
 import flwr as fl
+import copy
+import os
 
 from model import NextWordPredictor, train, test
 
+USER_MODEL_PATH = 'results/user/'
+GLOBAL_MODEL_PATH = 'results/global/model.pth'
+
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, trainloader, vallodaer, text_field, devices, test_devices, user, user_model_path, user_model, global_model) -> None:
+    def __init__(self, trainloader, vallodaer, vocab_size, devices, test_devices, user) -> None:
         super().__init__()
+        print(f'Initializing flower client {user}')
 
         self.devices = devices
         self.test_devices = test_devices
@@ -21,10 +29,25 @@ class FlowerClient(fl.client.NumPyClient):
         self.trainloader = trainloader
         self.valloader = vallodaer
 
-        # a model that is randomly initialised at first
-        self.model = LSTM(text_field)
-        self.user_model = user_model
-        self.global_model = global_model
+        # a model that is randomly initialised at first and load user and global model
+        self.model = NextWordPredictor(vocab_size, 10, 10)
+
+        user_model_path = f'{USER_MODEL_PATH}{user}/model.pth'
+        if os.path.exists(user_model_path):
+            print(f'Loading user model {user_model_path}')
+            new_model = copy.deepcopy(self)
+            new_model.load_state_dict(torch.load(user_model_path))
+            self.user_model = new_model
+            print(f'User model loaded {user_model_path}')
+
+        if os.path.exists(GLOBAL_MODEL_PATH):
+            print(f'Loading global model {user}')
+            new_model = copy.deepcopy(self)
+            new_model.load_state_dict(torch.load(user_model_path))
+            self.global_model = new_model
+            print(f'Global model loaded {user}')
+        
+        print(f'Initialized flower client {user}')
 
     def set_parameters(self, parameters):
         """Receive parameters and apply them to the local model."""
@@ -38,17 +61,16 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         lr = config["lr"]
-        momentum = config["momentum"]
         epochs = config["local_epochs"]
 
         # copy parameters sent by the server into client's local model
         self.set_parameters(parameters)
 
-        # a very standard looking optimiser
-        optim = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum)
+        criterion = CrossEntropyLoss()
+        optimizer = Adam(self.model.parameters(), lr=lr)
 
         # local model training
-        train(self.model, optim, self.trainloader, self.valloader, epochs, len(self.trainloader)//2, f"{self.user.name}/{round}/local", self.device)
+        train(self.model, self.trainloader, criterion, optimizer, epochs)
 
         # TODO: Should put personal and global modal fitting parts
         # Flower clients need to return three arguments: the updated model, the number
@@ -59,21 +81,26 @@ class FlowerClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         self.set_parameters(parameters)
-        loss, accuracy = test(self.model, self.valloader, self.device)
+        criterion = CrossEntropyLoss()
+        loss = test(self.model, self.valloader, self.device, criterion)
         # TODO: Set global and user level evaluations
-        return float(loss), len(self.valloader), {"accuracy": accuracy}
+        return float(loss), len(self.valloader)
 
 
-def generate_client_fn(trainloaders, valloaders):
+def generate_client_fn(train):
     def client_fn(cid: str):
         # This function will be called internally by the VirtualClientEngine
         # Each time the cid-th client is told to participate in the FL
         # simulation (whether it is for doing fit() or evaluate())
-
+       
         print({"generate_client_fn/client_fn cid": cid})
         return FlowerClient(
-            trainloader=trainloaders[int(cid)],
-            vallodaer=valloaders[int(cid)],
+            trainloader=train[int(cid)][0],
+            vallodaer=train[int(cid)][1],
+            vocab_size=train[int(cid)][3],
+            devices=[],
+            test_devices=[],
+            user=train[int(cid)][2],
         ).to_client()
 
     # return the function to spawn client

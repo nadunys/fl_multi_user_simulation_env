@@ -7,7 +7,7 @@ from flwr.server.client_proxy import ClientProxy
 
 from init_devices import get_device_parameters
 from device_selection import Device, compute_metrics, select_devices_UAC
-from model import LSTM
+from model import NextWordPredictor
 
 from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays
 from flwr.server.client_manager import ClientManager
@@ -158,7 +158,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
 
                     if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
                         input_shape = (seq_len, input_dim)
-                        user_model = LSTM()
+                        user_model = NextWordPredictor()
 
                     devices = devices_list
                     params_by_user = {u: [] for u in list(user_list)}
