@@ -75,14 +75,15 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                     ]
                 }
                 json.dump(round_data, json_file)
+            
+            print('Initialized personalization strategy')
         except Exception as e:
-            print('Something happened in Strategy init')
+            print('Something went wrong while initializing personalization strategy')
             print(e)
-
-        
-    def configure_fit(self, rnd: int, parameters: Parameters, client_manager: ClientManager):
+    
+    def configure_fit(self, server_round: int, parameters: Parameters, client_manager: ClientManager):
         if device_selection == 'none':
-            return super().configure_fit(rnd, parameters, client_manager)
+            return super().configure_fit(server_round, parameters, client_manager)
         else:
             try:
                 sample_size, min_num_clients = self.num_fit_clients(client_manager.num_available())
@@ -97,7 +98,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                 
                 # Sample clients
                 msg = "Round %s, sample %s clients (based on device selection criteria)"
-                log(DEBUG, msg, str(rnd), str(sample_size))
+                log(DEBUG, msg, str(server_round), str(sample_size))
                 all_clients = client_manager.all()
                 cid_idx: Dict[int, str] = {}
                 for idx, (cid, _) in enumerate(all_clients.items()):
@@ -105,8 +106,8 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                     # print("All clients cid: {}, idx: {}".format(cid, idx))
 
                 global CURR_ROUND
-                CURR_ROUND = rnd
-                if rnd == 1:
+                CURR_ROUND = server_round
+                if server_round == 1:
                     # sampled_indices = select_devices(rnd, devices=self.devices, strategy='random')
                     sampled_indices = [*range(len(all_clients))]
                 else:
@@ -124,18 +125,18 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                     if self.devices[idx].t_local > round_time:
                         round_time = self.devices[idx].t_local
 
-                    self.devices[idx].update_local_state(rnd)
+                    self.devices[idx].update_local_state(server_round)
                     self.round_times.append(round_time)
 
                 config = {}
                 if self.on_fit_config_fn is not None:
-                    config = self.on_fit_config_fn(rnd)
+                    config = self.on_fit_config_fn(server_round)
 
                 FitIns(parameters, config)
             except Exception as e:
                 print("Something wrong with CONFIGURE FIT")
                 print(e)
-            return super().configure_fit(rnd, parameters, client_manager)
+            return super().configure_fit(server_round, parameters, client_manager)
     
     def aggregate_fit(self,
                     server_round: int,
