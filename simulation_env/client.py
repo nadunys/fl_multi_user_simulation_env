@@ -5,7 +5,7 @@ from flwr.common import NDArrays, Scalar
 import torch
 import flwr as fl
 
-from model import LSTM, train, test
+from model import NextWordPredictor, train, test
 
 
 class FlowerClient(fl.client.NumPyClient):
@@ -65,18 +65,12 @@ class FlowerClient(fl.client.NumPyClient):
 
 
 def generate_client_fn(trainloaders, valloaders):
-    """Return a function that can be used by the VirtualClientEngine.
-
-    to spawn a FlowerClient with client id `cid`.
-    """
-
     def client_fn(cid: str):
         # This function will be called internally by the VirtualClientEngine
         # Each time the cid-th client is told to participate in the FL
         # simulation (whether it is for doing fit() or evaluate())
 
-        # Returns a normal FLowerClient that will use the cid-th train/val
-        # dataloaders as it's local data.
+        print({"generate_client_fn/client_fn cid": cid})
         return FlowerClient(
             trainloader=trainloaders[int(cid)],
             vallodaer=valloaders[int(cid)],
