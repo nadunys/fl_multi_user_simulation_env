@@ -4,9 +4,9 @@ import torch.nn as nn
 class NextWordPredictor(nn.Module):
     def __init__(self, vocab_size, embedding_dim, hidden_dim):
         super(NextWordPredictor, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding = nn.Embedding(10000, embedding_dim)
         self.rnn = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, vocab_size)
+        self.fc = nn.Linear(hidden_dim, 10000)
 
     def forward(self, x):
         embedded = self.embedding(x)
@@ -16,6 +16,7 @@ class NextWordPredictor(nn.Module):
     
 def train(model, train_loader, criterion, optimizer, epochs):
     model.train()
+    final_loss = 0.0
     for epoch in range(epochs):
         running_loss = 0.0
         for inputs, targets in train_loader:
@@ -25,7 +26,9 @@ def train(model, train_loader, criterion, optimizer, epochs):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
+        final_loss = running_loss
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss / len(train_loader)}")
+    return final_loss
 
 def test(model, test_loader, criterion):
     model.eval()

@@ -70,14 +70,14 @@ class FlowerClient(fl.client.NumPyClient):
         optimizer = Adam(self.model.parameters(), lr=lr)
 
         # local model training
-        train(self.model, self.trainloader, criterion, optimizer, epochs)
+        loss = train(self.model, self.trainloader, criterion, optimizer, epochs)
 
         # TODO: Should put personal and global modal fitting parts
         # Flower clients need to return three arguments: the updated model, the number
         # of examples in the client (although this depends a bit on your choice of aggregation
         # strategy), and a dictionary of metrics (here you can add any additional data, but these
         # are ideally small data structures)
-        return self.get_parameters({}), len(self.trainloader), {}
+        return self.get_parameters({}), len(self.trainloader), {'loss': loss}
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         self.set_parameters(parameters)

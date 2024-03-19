@@ -148,7 +148,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             if not results:
                 return None, {}
             
-            global_weights_results = {}
+            global_weights_results = []
 
             if device_selection != 'none':
                 for client, r in results:
