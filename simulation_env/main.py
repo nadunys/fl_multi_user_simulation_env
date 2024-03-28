@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
 
-from dataset import get_dataset
+from datatests.cifar import load_data
 from client import generate_client_fn
 from server import get_on_fit_config, get_on_evaluate_config
 from strategy import PersonalizationStrategy
@@ -23,14 +23,15 @@ def main(cfg: DictConfig):
     ## 2. Prepare your dataset
     # data will be in the format of 
     # User {
-    #     user: number
-    #     text: string
+    #     user_id: number
+    #     train: Dataloader
+    #     test: Dataloader
     # }
     # there will be multiple data from each user 
-    train, test, validation = get_dataset()
+    dataset = load_data(10, 3)
 
     ## 3. Define your clients
-    client_fn = generate_client_fn(train.values)
+    client_fn = generate_client_fn(dataset)
 
     ## 4. Define your strategy
     strategy = PersonalizationStrategy(

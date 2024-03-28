@@ -7,12 +7,14 @@ from flwr.server.client_proxy import ClientProxy
 
 from init_devices import get_device_parameters
 from device_selection import Device, compute_metrics, select_devices_UAC
-from model import NextWordPredictor
+from models.cifar import Net
+from client import get_user_parameters, load_model, save_model, set_user_model_params
 
-from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays
+from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays, ndarrays_to_parameters
 from flwr.server.client_manager import ClientManager
 from logging import DEBUG, INFO
 from flwr.common.logger import log
+from flwr.server.strategy.aggregate import aggregate
 
 devices_list = ['laptop', 'mobile_phone', 'smart_watch']
 user_list = set()
@@ -21,6 +23,7 @@ sample_device_per = 0.5
 user_model_path = './checkpoints'
 seq_len = 10
 input_dim = 100
+num_clients = 25
 WAIT_TIMEOUT = 600
 SEED = 42
 
@@ -82,7 +85,9 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             print(e)
     
     def configure_fit(self, server_round: int, parameters: Parameters, client_manager: ClientManager):
+        print('Start configure fit')
         if device_selection == 'none':
+            print('End configure fit in device selection == none')
             return super().configure_fit(server_round, parameters, client_manager)
         else:
             try:
@@ -136,8 +141,9 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             except Exception as e:
                 print("Something wrong with CONFIGURE FIT")
                 print(e)
+            print('Finish configure fit')
             return super().configure_fit(server_round, parameters, client_manager)
-    
+        
     def aggregate_fit(self,
                     server_round: int,
                     results: List[Tuple[ClientProxy, FitRes]],
@@ -148,7 +154,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             if not results:
                 return None, {}
             
-            global_weights_results = {}
+            global_weights_results = []
 
             if device_selection != 'none':
                 for client, r in results:
@@ -157,14 +163,46 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         self.devices[int(client.cid)].update_loss(r.metrics['loss'])
                         global_weights_results.append((parameters_to_ndarrays(r.parameters), r.num_examples))
 
-                    if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                        input_shape = (seq_len, input_dim)
-                        user_model = NextWordPredictor()
+            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
+                input_shape = (seq_len, input_dim)
+                user_model = Net()
 
-                    devices = devices_list
-                    params_by_user = {u: [] for u in list(user_list)}
-                    # TODO: load user, device and set weights
+                params_by_user = {u: [] for u in list(user_list)}
+                devices = devices_list
+                num_users = int(num_clients / len(devices))
 
+                print(f'Devices: {devices}')
+                print(f'Num users: {num_users}')
+
+                for user in range(num_users):
+                    device_params = []
+                    for device_idx, device in enumerate(devices):
+                        cid = user * len(devices) + device_idx
+                        if cid in self.sampled_indices:
+                            try:
+                                # user load model
+                                user_model_x = load_model(user_model, f'results/user/{user}')
+                                user_params = get_user_parameters(user_model_x)
+                                device_params.append((user_params, 10))
+                                print(f'User: {user}, Device: {device}')
+
+                            except Exception as e:
+                                print('User device weights not found')
+                            
+                    if len(device_params) > 0:
+                        try:
+                            user_params = aggregate(device_params)
+                            user_model = Net()
+                            set_user_model_params(user_model, user_params)
+                            save_model(user_model, f'results/user/{user}')
+                            # set user model weights
+                            # save user model weights
+                            print(f'Fit user model weights: {user}')
+                        except Exception as e:
+                            print(f'User model not found: {user}')
+            global_weights_prime = aggregate(global_weights_results)
+            return ndarrays_to_parameters(global_weights_prime), {}
+                
         except Exception as e:
             print('Something went wrong with aggregrate fit')
             print(e)
@@ -178,7 +216,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
         global device_accuracies, user_accuracies
         try:
             if not results:
-                return None
+                super().aggregate_evaluate(server_round, results, failures)
             
             # accuracy of each client
             accuracies = []

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from typing import Dict, Tuple
 from flwr.common import NDArrays, Scalar
-from torch.nn import CrossEntropyLoss
+from torch.nn import CrossEntropyLoss, Module
 from torch.optim import Adam
 
 import torch
@@ -9,45 +9,38 @@ import flwr as fl
 import copy
 import os
 
-from model import NextWordPredictor, train, test
+from models.cifar import Net, train, test
 
 USER_MODEL_PATH = 'results/user/'
-GLOBAL_MODEL_PATH = 'results/global/model.pth'
+GLOBAL_MODEL_PATH = 'results/global'
 
 
 class FlowerClient(fl.client.NumPyClient):
-    def __init__(self, trainloader, vallodaer, vocab_size, devices, test_devices, user) -> None:
+    def __init__(self, trainloader, valloader, devices, test_devices, user_id, cid) -> None:
         super().__init__()
-        print(f'Initializing flower client {user}')
+        print(f'Initializing flower client {user_id}')
 
         self.devices = devices
         self.test_devices = test_devices
-        self.user = user
+        self.user = user_id
+        self.cid = cid
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # the dataloaders that point to the data associated to this client
         self.trainloader = trainloader
-        self.valloader = vallodaer
+        self.valloader = valloader
 
         # a model that is randomly initialised at first and load user and global model
-        self.model = NextWordPredictor(vocab_size, 10, 10)
+        self.model = Net()
 
-        user_model_path = f'{USER_MODEL_PATH}{user}/model.pth'
-        if os.path.exists(user_model_path):
-            print(f'Loading user model {user_model_path}')
-            new_model = copy.deepcopy(self)
-            new_model.load_state_dict(torch.load(user_model_path))
-            self.user_model = new_model
-            print(f'User model loaded {user_model_path}')
+        self.user_model_path = f'{USER_MODEL_PATH}{user_id}'
+        self.global_model_path = f'{GLOBAL_MODEL_PATH}'
 
-        if os.path.exists(GLOBAL_MODEL_PATH):
-            print(f'Loading global model {user}')
-            new_model = copy.deepcopy(self)
-            new_model.load_state_dict(torch.load(user_model_path))
-            self.global_model = new_model
-            print(f'Global model loaded {user}')
+        user_model = load_model(Net(), self.user_model_path)
+        if user_model is not None:
+            self.model = copy.deepcopy(user_model)
         
-        print(f'Initialized flower client {user}')
+        print(f'Initialized flower client {user_id}')
 
     def set_parameters(self, parameters):
         """Receive parameters and apply them to the local model."""
@@ -60,34 +53,52 @@ class FlowerClient(fl.client.NumPyClient):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
 
     def fit(self, parameters, config):
+        print(f'Fitting {self.user} {self.device} {self.user_model_path}')
         lr = config["lr"]
         epochs = config["local_epochs"]
 
-        # copy parameters sent by the server into client's local model
-        self.set_parameters(parameters)
+        user_model = load_model(Net(), self.user_model_path)
+        global_model = load_model(Net(), self.global_model_path)
+        print(f'User and gloabal models loaded: {self.user}')
 
-        criterion = CrossEntropyLoss()
-        optimizer = Adam(self.model.parameters(), lr=lr)
+        if user_model is None:
+            user_model = copy.deepcopy(self.model)
+            print(f'Current model got copied for user_model {self.user}')
+        
+        if global_model is None:
+            global_model = copy.deepcopy(user_model)
+            print(f'Current model got copied for global_model {self.user}')
+
+        # copy parameters sent by the server into client's local model
+        print(f'Starting to set params {self.user}')
+        self.set_parameters(parameters)
+        print(f'Self params were modified {self.user}')
+        set_user_model_params(user_model, parameters)
+        print(f'User params were modified {self.user}')
 
         # local model training
-        train(self.model, self.trainloader, criterion, optimizer, epochs)
+        print(f'Local training started for user {self.user}')
+        loss = train(self.model, self.trainloader, epochs)
+        print(f'Training done for user {self.user} ')
+        set_user_model_params(user_model, self.get_parameters({}))
+        print(f'Local params were set to user model {self.user}')
 
-        # TODO: Should put personal and global modal fitting parts
-        # Flower clients need to return three arguments: the updated model, the number
-        # of examples in the client (although this depends a bit on your choice of aggregation
-        # strategy), and a dictionary of metrics (here you can add any additional data, but these
-        # are ideally small data structures)
-        return self.get_parameters({}), len(self.trainloader), {}
+        # save models
+        save_model(user_model, self.user_model_path)
+        save_model(global_model, self.global_model_path)
+
+        print(f'Finish client fitting {self.user} {self.device} {self.user_model_path}')
+        return self.get_parameters({}), len(self.trainloader), {'loss': loss}
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         self.set_parameters(parameters)
-        criterion = CrossEntropyLoss()
-        loss = test(self.model, self.valloader, self.device, criterion)
+        loss, accuracy = test(self.model, self.valloader)
+        print(f'loss: {loss}, accuracy: {accuracy}')
         # TODO: Set global and user level evaluations
         return float(loss), len(self.valloader)
 
 
-def generate_client_fn(train):
+def generate_client_fn(dataset):
     def client_fn(cid: str):
         # This function will be called internally by the VirtualClientEngine
         # Each time the cid-th client is told to participate in the FL
@@ -95,13 +106,38 @@ def generate_client_fn(train):
        
         print({"generate_client_fn/client_fn cid": cid})
         return FlowerClient(
-            trainloader=train[int(cid)][0],
-            vallodaer=train[int(cid)][1],
-            vocab_size=train[int(cid)][3],
+            trainloader=dataset[int(cid)]['train'],
+            valloader=dataset[int(cid)]['test'],
             devices=[],
             test_devices=[],
-            user=train[int(cid)][2],
+            user_id=dataset[int(cid)]['user_id'],
+            cid=cid
         ).to_client()
 
     # return the function to spawn client
     return client_fn
+
+def load_model(model: Net, model_path: str):
+    if os.path.exists(model_path):
+        print(f'Loading model {model_path}')
+        new_model = copy.deepcopy(model)
+        new_model.load_state_dict(torch.load(f'{model_path}/model.pth'))
+        
+        print(f'Model loaded {model_path}')
+        return new_model
+    
+    return None
+
+def save_model(model, path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    torch.save(model.state_dict(), f'{path}/model.pth')
+
+def set_user_model_params(model: Net, params):
+    params_dict = zip(model.state_dict().keys(), params)
+    state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+    model.load_state_dict(state_dict, strict=True)
+
+def get_user_parameters(model):
+    return [val.cpu().numpy() for _, val in model.state_dict().items()]
+    
