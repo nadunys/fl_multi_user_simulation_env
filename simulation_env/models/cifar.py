@@ -23,10 +23,10 @@ class Net(nn.Module):
         x = self.fc3(x)
         return x
 
-def train(net, trainloader, epochs):
+def train(net, trainloader, epochs, lr):
     """Train the network on the training set."""
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
     loss_sum = 0
     for _ in range(epochs):
         for images, labels in trainloader:

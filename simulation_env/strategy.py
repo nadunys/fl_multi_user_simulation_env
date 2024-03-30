@@ -21,11 +21,13 @@ user_list = set()
 device_selection = "overall"
 sample_device_per = 0.5
 user_model_path = './checkpoints'
+round_results_path = './results'
 seq_len = 10
 input_dim = 100
 num_clients = 25
 WAIT_TIMEOUT = 600
 SEED = 42
+ROUND = 5
 
 np.random.seed(SEED)
 
@@ -219,26 +221,126 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                 super().aggregate_evaluate(server_round, results, failures)
             
             # accuracy of each client
-            accuracies = []
-            examples = []
-            losses = []
+            accuracies = [r.metrics["accuracy"] * r.num_examples for _, r in results]
+            examples = [r.num_examples for _, r in results]
+            losses = [r.loss for _, r in results]
 
-            # global model accurary and loss
-            aggregated_accuracy = sum(accuracies) / sum(examples)
-            aggergated_los = np.mean(losses)
+            # Aggregate and print custom metric
+            accuracy_aggregated = sum(accuracies) / sum(examples)
+            loss_aggregated = np.mean(losses)
+            print(f"Round {server_round} accuracy aggregated from client results: {accuracy_aggregated}")
 
-            print(f'For round: {server_round} aggregated accuracy is: {aggregated_accuracy}')
+            # User model results aggregation
+            if user_model_path != "no_personal" and user_model_path != "local_finetuning":
+                # User model performance
+                # Weigh accuracy of each client by # examples used
+                user_weighted_accuracies = [r.metrics["user_accuracy"] * r.num_examples for _, r in results]
+                user_accuracies = [r.metrics["user_accuracy"] for _, r in results]
+                user_losses = [r.metrics["user_loss"] for _, r in results]
 
-            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                # create user and device weighted accuracy and loss
-                print('create user and device weighted accuracies')
-            
-            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                # write round results with user results
-                print('write round aand user results')
+                # Aggregate all user model test results
+                user_weighted_accuracy_agg = sum(user_weighted_accuracies) / sum(examples)
+                user_weighted_accuracy_var = np.var(user_weighted_accuracies)
+                user_accuracy_agg = np.mean(user_accuracies)
+                user_accuracy_var = np.var(user_accuracies)
+                user_loss_agg = np.mean(user_losses)
+
+                print(f"USER Round {server_round} WEIGHTED accuracy aggregated from client results: {user_weighted_accuracy_agg}")
+                print(f"USER Round {server_round} accuracy aggregated from client results: {user_accuracy_agg}")
+
+                # Device model performance
+                # Weigh accuracy of each client by # examples used
+                device_weighted_accuracies = [r.metrics["device_accuracy"] * r.num_examples for _, r in results]
+                device_accuracies = [r.metrics["device_accuracy"] for _, r in results]
+                device_losses = [r.metrics["device_loss"] for _, r in results]
+
+                # Aggregate all user model test results
+                device_weighted_accuracy_agg = sum(device_weighted_accuracies) / sum(examples)
+                device_weighted_accuracy_var = np.var(device_weighted_accuracies)
+                device_accuracy_agg = np.mean(device_accuracies)
+                device_accuracy_var = np.var(device_accuracies)
+                device_loss_agg = np.mean(device_losses)
+
+                print(
+                    f"DEVICE Round {server_round} WEIGHTED accuracy aggregated from client results: {device_weighted_accuracy_agg}")
+                print(f"DEVICE Round {server_round} accuracy aggregated from client results: {device_accuracy_agg}")
+
+
+            # Summary for TensorBoard
+            step = server_round if server_round > 0 else ROUND + 1
+            total_loss, dead_devices = compute_metrics(self.devices)
+
+            print("MAX ROUND TIME")
+            print(max(self.round_times))
+            print("Sampled INDICES")
+            print(self.sampled_indices)
+            if user_model_path != "no_personal" and user_model_path != "local_finetuning":
+                try:
+                    with open("{}/{}.json".format(round_results_path, server_round), 'w') as json_file:
+                        round_data = {
+                            'rnd': server_round,
+                            'global_loss': loss_aggregated,
+                            'global_accuracy': accuracy_aggregated,
+                            'global_accuracies': accuracies,
+                            'global_examples': examples,
+
+                            'user_loss': user_loss_agg,
+                            'user_weighted_accuracy': user_weighted_accuracy_agg,
+                            'user_weighted_accuracy_var': user_weighted_accuracy_var,
+                            'user_accuracy': user_accuracy_agg,
+                            'user_accuracy_var': user_accuracy_var,
+                            'user_accuracies': user_accuracies,
+                            'device_weighted_accuracy': device_weighted_accuracy_agg,
+                            'device_weighted_accuracy_var': device_weighted_accuracy_var,
+                            'device_accuracy': device_accuracy_agg,
+                            'device_accuracy_var': device_accuracy_var,
+                            'device_accuracies': device_accuracies,
+                            'total_loss': total_loss,
+                            'dead_devices': dead_devices,
+                            'max_round_time': max(self.round_times),
+                            'selected_devices': self.sampled_indices,
+                            'device_snapshot': [
+                                {
+                                    'device_id': i,
+                                    'stat_util': d.get_stat_utility(),
+                                    'device_util': d.get_device_utility(),
+                                    'time_util': d.get_time_utility(),
+                                    'overall_util': d.get_overall_utility(),
+                                    'drain': d.drain,
+                                    't_local': d.t_local
+                                } for i, d in enumerate(self.devices)
+                            ],
+                        }
+
+                        json.dump(round_data, json_file)
+                except Exception as e:
+                    print(e)
+                    print("ROUND DATA wrong!!!")
             else:
-                # write only round results
-                print('write only round results')
+                with open("{}/{}.json".format(round_results_path, server_round), 'w') as json_file:
+                    round_data = {
+                        'rnd': server_round,
+                        'global_loss': loss_aggregated,
+                        'global_accuracy': accuracy_aggregated,
+                        'global_accuracies': accuracies,
+                        'global_examples': examples,
+                        'total_loss': total_loss,
+                        'dead_devices': dead_devices,
+                        'device_snapshot': [
+                            {
+                                'device_id': i,
+                                'stat_util': d.get_stat_utility(),
+                                'device_util': d.get_device_utility(),
+                                'time_util': d.get_time_utility(),
+                                'overall_util': d.get_overall_utility(),
+                                'drain': d.drain,
+                                't_local': d.t_local
+                            } for i, d in enumerate(self.devices)
+                        ],
+                        'max_round_time': max(self.round_times),
+                        'selected_devices': list(self.sampled_indices),
+                    }
+                    json.dump(round_data, json_file)
 
         except Exception as e:
             print('Something went wrong in aggregate evaluate')

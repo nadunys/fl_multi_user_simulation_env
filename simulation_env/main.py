@@ -28,33 +28,34 @@ def main(cfg: DictConfig):
     #     test: Dataloader
     # }
     # there will be multiple data from each user 
-    dataset = load_data(10, 3)
+    dataset = load_data(cfg.num_clients, cfg.num_devices_per_client)
 
     ## 3. Define your clients
     client_fn = generate_client_fn(dataset)
 
     ## 4. Define your strategy
+    avalible_clients = cfg.num_clients * cfg.num_devices_per_client
     strategy = PersonalizationStrategy(
         fraction_fit=1.0,  # in simulation, since all clients are available at all times, we can just use `min_fit_clients` to control exactly how many clients we want to involve during fit
         fraction_evaluate=1.0,  # similar to fraction_fit, we don't need to use this argument.
         min_fit_clients=cfg.num_clients_per_round_fit,  # number of clients to sample for fit()
         min_evaluate_clients=cfg.num_clients_per_round_eval,  # number of clients to sample for evaluate()
-        min_available_clients=cfg.num_clients,  # total clients in the simulation
+        min_available_clients=avalible_clients,  # total clients in the simulation
         on_fit_config_fn=get_on_fit_config(cfg.config_fit), # a function to execute to obtain the configuration to send to the clients during fit()
         on_evaluate_config_fn=get_on_evaluate_config(cfg.config_evaluate),
-        # initial_parameters=
-        num_clients=cfg.num_clients
+        num_clients=avalible_clients
     )  # a function to run on the server side to evaluate the global model.
 
     ## 5. Start Simulation
     # With the dataset partitioned, the client function and the strategy ready, we can now launch the simulation!
     history = fl.simulation.start_simulation(
         client_fn=client_fn,  # a function that spawns a particular client
-        num_clients=cfg.num_clients,  # total number of clients
+        num_clients=avalible_clients,  # total number of clients
         strategy=strategy,  # our strategy of choice
         config=fl.server.ServerConfig(
             num_rounds=cfg.num_rounds
         ),  # minimal config for the server loop telling the number of rounds in FL
+        client_resources={"num_cpus": 2, "num_gpus": 0.0},
     )
     
     ## 6. Save your results

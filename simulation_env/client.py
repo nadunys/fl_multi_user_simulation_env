@@ -1,8 +1,6 @@
 from collections import OrderedDict
-from typing import Dict, Tuple
+from typing import Dict
 from flwr.common import NDArrays, Scalar
-from torch.nn import CrossEntropyLoss, Module
-from torch.optim import Adam
 
 import torch
 import flwr as fl
@@ -78,7 +76,7 @@ class FlowerClient(fl.client.NumPyClient):
 
         # local model training
         print(f'Local training started for user {self.user}')
-        loss = train(self.model, self.trainloader, epochs)
+        loss = train(self.model, self.trainloader, epochs, lr)
         print(f'Training done for user {self.user} ')
         set_user_model_params(user_model, self.get_parameters({}))
         print(f'Local params were set to user model {self.user}')
@@ -91,11 +89,25 @@ class FlowerClient(fl.client.NumPyClient):
         return self.get_parameters({}), len(self.trainloader), {'loss': loss}
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
-        self.set_parameters(parameters)
-        loss, accuracy = test(self.model, self.valloader)
-        print(f'loss: {loss}, accuracy: {accuracy}')
-        # TODO: Set global and user level evaluations
-        return float(loss), len(self.valloader)
+        try:
+            print(f'starting client evaluate {config} {parameters}')
+            self.set_parameters(parameters)
+            print('self params set')
+            loss, accuracy = test(self.model, self.valloader)
+            print(f'loss: {loss} accuracy: {accuracy} after calling test')
+            user_loss, user_accuracy = loss, accuracy
+            device_loss, device_accuracy = loss, accuracy
+
+            user_model = load_model(Net(), self.user_model_path)
+            if user_model is not None:
+                set_user_model_params(user_model, parameters)
+                user_loss, user_accuracy = test(user_model, self.valloader)
+            return loss, len(self.valloader), {"accuracy": accuracy, "user": self.user,
+                                            "user_accuracy": user_accuracy, "user_loss": user_loss,
+                                            "device_accuracy": device_accuracy, "device_loss": device_loss}
+        except Exception as e:
+            print('Something wrong with client evaluation')
+            print(e)        
 
 
 def generate_client_fn(dataset):
