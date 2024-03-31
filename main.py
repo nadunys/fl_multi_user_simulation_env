@@ -55,7 +55,8 @@ def main(cfg: DictConfig):
         config=fl.server.ServerConfig(
             num_rounds=cfg.num_rounds
         ),  # minimal config for the server loop telling the number of rounds in FL
-        client_resources={"num_cpus": 2, "num_gpus": 0.0},
+        client_resources={"num_cpus": 2, "num_gpus": 1},
+        ray_init_args={"include_dashboard": True, 'num_cpus': 4, 'num_gpus': 1}
     )
     
     ## 6. Save your results

@@ -90,7 +90,7 @@ class FlowerClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         try:
-            print(f'starting client evaluate {config} {parameters}')
+            print(f'starting client evaluate {config}')
             self.set_parameters(parameters)
             print('self params set')
             loss, accuracy = test(self.model, self.valloader)

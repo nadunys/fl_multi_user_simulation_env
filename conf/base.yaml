@@ -1,14 +1,14 @@
 ---
 num_rounds: 10
-num_clients: 20 # number of total clients available
+num_clients: 10 # number of total clients available
 num_devices_per_client: 3
 num_clients_per_round_fit: 10
 num_clients_per_round_eval: 10
 batch_size: 20 # batch size to use by clients during training
 config_fit: # a config that each client will receive (this is send by the server) when they are sampled. This allows you to dynamically configure the training on the client side as the simulation progresses
-  lr: 0.001 # learning rate to use by the clients
+  lr: 0.01 # learning rate to use by the clients
   local_epochs: 5 # number of training epochs each clients does in a fit() round
-  batch_size: 5
+  batch_size: 30
 config_evaluate:
   val_steps: 5
-  batch_size: 5  
+  batch_size: 30 

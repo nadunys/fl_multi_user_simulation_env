@@ -40,7 +40,7 @@ def load_data(user_size, devices_per_user):
 
     for i in range(1, user_size*devices_per_user + 1):
         dataset.append({
-            'user_id': i//user_size,
+            'user_id': i % user_size,
             'train': trainloaders[i-1],
             'test': testloaders[i-1]
         })

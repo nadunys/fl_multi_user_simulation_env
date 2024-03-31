@@ -18,7 +18,7 @@ from flwr.server.strategy.aggregate import aggregate
 
 devices_list = ['laptop', 'mobile_phone', 'smart_watch']
 user_list = set()
-device_selection = "overall"
+device_selection = "stat"
 sample_device_per = 0.5
 user_model_path = './checkpoints'
 round_results_path = './results'
@@ -152,7 +152,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                     failures: List[Union[Tuple[ClientProxy, FitRes], BaseException]]
                     ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
         try:
-            print("Aggeregate fit is called")
+            print(f"Aggeregate fit is called {server_round}")
             if not results:
                 return None, {}
             
@@ -166,10 +166,8 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         global_weights_results.append((parameters_to_ndarrays(r.parameters), r.num_examples))
 
             if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                input_shape = (seq_len, input_dim)
                 user_model = Net()
 
-                params_by_user = {u: [] for u in list(user_list)}
                 devices = devices_list
                 num_users = int(num_clients / len(devices))
 
@@ -197,8 +195,6 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                             user_model = Net()
                             set_user_model_params(user_model, user_params)
                             save_model(user_model, f'results/user/{user}')
-                            # set user model weights
-                            # save user model weights
                             print(f'Fit user model weights: {user}')
                         except Exception as e:
                             print(f'User model not found: {user}')
@@ -231,42 +227,38 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             print(f"Round {server_round} accuracy aggregated from client results: {accuracy_aggregated}")
 
             # User model results aggregation
-            if user_model_path != "no_personal" and user_model_path != "local_finetuning":
-                # User model performance
-                # Weigh accuracy of each client by # examples used
-                user_weighted_accuracies = [r.metrics["user_accuracy"] * r.num_examples for _, r in results]
-                user_accuracies = [r.metrics["user_accuracy"] for _, r in results]
-                user_losses = [r.metrics["user_loss"] for _, r in results]
+            # User model performance
+            # Weigh accuracy of each client by # examples used
+            user_weighted_accuracies = [r.metrics["user_accuracy"] * r.num_examples for _, r in results]
+            user_accuracies = [r.metrics["user_accuracy"] for _, r in results]
+            user_losses = [r.metrics["user_loss"] for _, r in results]
 
-                # Aggregate all user model test results
-                user_weighted_accuracy_agg = sum(user_weighted_accuracies) / sum(examples)
-                user_weighted_accuracy_var = np.var(user_weighted_accuracies)
-                user_accuracy_agg = np.mean(user_accuracies)
-                user_accuracy_var = np.var(user_accuracies)
-                user_loss_agg = np.mean(user_losses)
+            # Aggregate all user model test results
+            user_weighted_accuracy_agg = sum(user_weighted_accuracies) / sum(examples)
+            user_weighted_accuracy_var = np.var(user_weighted_accuracies)
+            user_accuracy_agg = np.mean(user_accuracies)
+            user_accuracy_var = np.var(user_accuracies)
+            user_loss_agg = np.mean(user_losses)
 
-                print(f"USER Round {server_round} WEIGHTED accuracy aggregated from client results: {user_weighted_accuracy_agg}")
-                print(f"USER Round {server_round} accuracy aggregated from client results: {user_accuracy_agg}")
+            print(f"USER Round {server_round} WEIGHTED accuracy aggregated from client results: {user_weighted_accuracy_agg}")
+            print(f"USER Round {server_round} accuracy aggregated from client results: {user_accuracy_agg}")
 
-                # Device model performance
-                # Weigh accuracy of each client by # examples used
-                device_weighted_accuracies = [r.metrics["device_accuracy"] * r.num_examples for _, r in results]
-                device_accuracies = [r.metrics["device_accuracy"] for _, r in results]
-                device_losses = [r.metrics["device_loss"] for _, r in results]
+            # Device model performance
+            # Weigh accuracy of each client by # examples used
+            device_weighted_accuracies = [r.metrics["device_accuracy"] * r.num_examples for _, r in results]
+            device_accuracies = [r.metrics["device_accuracy"] for _, r in results]
+            device_losses = [r.metrics["device_loss"] for _, r in results]
 
-                # Aggregate all user model test results
-                device_weighted_accuracy_agg = sum(device_weighted_accuracies) / sum(examples)
-                device_weighted_accuracy_var = np.var(device_weighted_accuracies)
-                device_accuracy_agg = np.mean(device_accuracies)
-                device_accuracy_var = np.var(device_accuracies)
-                device_loss_agg = np.mean(device_losses)
+            # Aggregate all user model test results
+            device_weighted_accuracy_agg = sum(device_weighted_accuracies) / sum(examples)
+            device_weighted_accuracy_var = np.var(device_weighted_accuracies)
+            device_accuracy_agg = np.mean(device_accuracies)
+            device_accuracy_var = np.var(device_accuracies)
+            device_loss_agg = np.mean(device_losses)
 
-                print(
-                    f"DEVICE Round {server_round} WEIGHTED accuracy aggregated from client results: {device_weighted_accuracy_agg}")
-                print(f"DEVICE Round {server_round} accuracy aggregated from client results: {device_accuracy_agg}")
+            print(f"DEVICE Round {server_round} WEIGHTED accuracy aggregated from client results: {device_weighted_accuracy_agg}")
+            print(f"DEVICE Round {server_round} accuracy aggregated from client results: {device_accuracy_agg}")
 
-
-            # Summary for TensorBoard
             step = server_round if server_round > 0 else ROUND + 1
             total_loss, dead_devices = compute_metrics(self.devices)
 
@@ -274,49 +266,8 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             print(max(self.round_times))
             print("Sampled INDICES")
             print(self.sampled_indices)
-            if user_model_path != "no_personal" and user_model_path != "local_finetuning":
-                try:
-                    with open("{}/{}.json".format(round_results_path, server_round), 'w') as json_file:
-                        round_data = {
-                            'rnd': server_round,
-                            'global_loss': loss_aggregated,
-                            'global_accuracy': accuracy_aggregated,
-                            'global_accuracies': accuracies,
-                            'global_examples': examples,
-
-                            'user_loss': user_loss_agg,
-                            'user_weighted_accuracy': user_weighted_accuracy_agg,
-                            'user_weighted_accuracy_var': user_weighted_accuracy_var,
-                            'user_accuracy': user_accuracy_agg,
-                            'user_accuracy_var': user_accuracy_var,
-                            'user_accuracies': user_accuracies,
-                            'device_weighted_accuracy': device_weighted_accuracy_agg,
-                            'device_weighted_accuracy_var': device_weighted_accuracy_var,
-                            'device_accuracy': device_accuracy_agg,
-                            'device_accuracy_var': device_accuracy_var,
-                            'device_accuracies': device_accuracies,
-                            'total_loss': total_loss,
-                            'dead_devices': dead_devices,
-                            'max_round_time': max(self.round_times),
-                            'selected_devices': self.sampled_indices,
-                            'device_snapshot': [
-                                {
-                                    'device_id': i,
-                                    'stat_util': d.get_stat_utility(),
-                                    'device_util': d.get_device_utility(),
-                                    'time_util': d.get_time_utility(),
-                                    'overall_util': d.get_overall_utility(),
-                                    'drain': d.drain,
-                                    't_local': d.t_local
-                                } for i, d in enumerate(self.devices)
-                            ],
-                        }
-
-                        json.dump(round_data, json_file)
-                except Exception as e:
-                    print(e)
-                    print("ROUND DATA wrong!!!")
-            else:
+            
+            try:
                 with open("{}/{}.json".format(round_results_path, server_round), 'w') as json_file:
                     round_data = {
                         'rnd': server_round,
@@ -324,8 +275,21 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         'global_accuracy': accuracy_aggregated,
                         'global_accuracies': accuracies,
                         'global_examples': examples,
+                        'user_loss': user_loss_agg,
+                        'user_weighted_accuracy': user_weighted_accuracy_agg,
+                        'user_weighted_accuracy_var': user_weighted_accuracy_var,
+                        'user_accuracy': user_accuracy_agg,
+                        'user_accuracy_var': user_accuracy_var,
+                        'user_accuracies': user_accuracies,
+                        'device_weighted_accuracy': device_weighted_accuracy_agg,
+                        'device_weighted_accuracy_var': device_weighted_accuracy_var,
+                        'device_accuracy': device_accuracy_agg,
+                        'device_accuracy_var': device_accuracy_var,
+                        'device_accuracies': device_accuracies,
                         'total_loss': total_loss,
                         'dead_devices': dead_devices,
+                        'max_round_time': max(self.round_times),
+                        'selected_devices': self.sampled_indices,
                         'device_snapshot': [
                             {
                                 'device_id': i,
@@ -337,10 +301,12 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                                 't_local': d.t_local
                             } for i, d in enumerate(self.devices)
                         ],
-                        'max_round_time': max(self.round_times),
-                        'selected_devices': list(self.sampled_indices),
                     }
+
                     json.dump(round_data, json_file)
+            except Exception as e:
+                print(e)
+                print("ROUND DATA wrong!!!")
 
         except Exception as e:
             print('Something went wrong in aggregate evaluate')
