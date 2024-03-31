@@ -34,9 +34,9 @@ class FlowerClient(fl.client.NumPyClient):
         self.user_model_path = f'{USER_MODEL_PATH}{user_id}'
         self.global_model_path = f'{GLOBAL_MODEL_PATH}'
 
-        user_model = load_model(Net(), self.user_model_path)
-        if user_model is not None:
-            self.model = copy.deepcopy(user_model)
+        # user_model = load_model(Net(), self.user_model_path)
+        # if user_model is not None:
+        #     self.model = copy.deepcopy(user_model)
         
         print(f'Initialized flower client {user_id}')
 
