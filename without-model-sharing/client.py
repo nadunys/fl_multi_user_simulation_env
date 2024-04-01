@@ -46,13 +46,6 @@ class FlowerClient(fl.client.NumPyClient):
         # copy parameters sent by the server into client's local model
         self.set_parameters(parameters)
 
-        # fetch elements in the config sent by the server. Note that having a config
-        # sent by the server each time a client needs to participate is a simple but
-        # powerful mechanism to adjust these hyperparameters during the FL process. For
-        # example, maybe you want clients to reduce their LR after a number of FL rounds.
-        # or you want clients to do more local epochs at later stages in the simulation
-        # you can control these by customising what you pass to `on_fit_config_fn` when
-        # defining your strategy.
         lr = config["lr"]
         momentum = config["momentum"]
         epochs = config["local_epochs"]
@@ -60,17 +53,7 @@ class FlowerClient(fl.client.NumPyClient):
         # a very standard looking optimiser
         optim = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum)
 
-        # do local training. This function is identical to what you might
-        # have used before in non-FL projects. For more advance FL implementation
-        # you might want to tweak it but overall, from a client perspective the "local
-        # training" can be seen as a form of "centralised training" given a pre-trained
-        # model (i.e. the model received from the server)
         train(self.model, self.trainloader, optim, epochs, self.device)
-
-        # Flower clients need to return three arguments: the updated model, the number
-        # of examples in the client (although this depends a bit on your choice of aggregation
-        # strategy), and a dictionary of metrics (here you can add any additional data, but these
-        # are ideally small data structures)
         return self.get_parameters({}), len(self.trainloader), {}
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
@@ -88,12 +71,6 @@ def generate_client_fn(trainloaders, valloaders, num_classes):
     """
 
     def client_fn(cid: str):
-        # This function will be called internally by the VirtualClientEngine
-        # Each time the cid-th client is told to participate in the FL
-        # simulation (whether it is for doing fit() or evaluate())
-
-        # Returns a normal FLowerClient that will use the cid-th train/val
-        # dataloaders as it's local data.
         return FlowerClient(
             trainloader=trainloaders[int(cid)],
             vallodaer=valloaders[int(cid)],

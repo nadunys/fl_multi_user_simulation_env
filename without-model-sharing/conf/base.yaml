@@ -1,9 +1,4 @@
 ---
-# this is a very minimal config file in YAML format
-# it will be processed by Hydra at runtime
-# you might notice it doesn't have anything special that other YAML files don't have
-# check the followup tutorial on how to use Hydra in conjunction with Flower for a 
-# much more advanced usage of Hydra configs
 
 num_rounds: 10 # number of FL rounds in the experiment
 num_clients: 30 # number of total clients available (this is also the number of partitions we need to create)
