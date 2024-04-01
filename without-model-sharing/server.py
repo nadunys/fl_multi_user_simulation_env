@@ -37,7 +37,7 @@ def get_evaluate_fn(num_classes: int, testloader):
         loss, accuracy = test(model, testloader[server_round])
 
         try:
-            with open(f'./results/round-3/{server_round}.json', 'w') as json_file:
+            with open(f'./results/{server_round}.json', 'w') as json_file:
                 round_data = {
                     'loss': loss,
                     'accuracy': accuracy
