@@ -7,10 +7,9 @@ from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
 
-from dataset import prepare_dataset
+from dataset import load_data
 from client import generate_client_fn
-from server import get_on_fit_config, get_evaluate_fn
-
+from server import get_on_fit_config, get_evaluate_fn, get_on_evaluate_config
 
 # A decorator for Hydra. This tells hydra to by default load the config in conf/base.yaml
 @hydra.main(config_path="conf", config_name="base", version_base=None)
@@ -20,9 +19,7 @@ def main(cfg: DictConfig):
     save_path = HydraConfig.get().runtime.output_dir
 
     ## 2. Prepare your dataset
-    trainloaders, validationloaders, testloader = prepare_dataset(
-        cfg.num_clients, cfg.batch_size
-    )
+    trainloaders, validationloaders = load_data(cfg.num_clients)
 
     ## 3. Define your clients
     client_fn = generate_client_fn(trainloaders, validationloaders, cfg.num_classes)
@@ -37,8 +34,10 @@ def main(cfg: DictConfig):
         on_fit_config_fn=get_on_fit_config(
             cfg.config_fit
         ),  # a function to execute to obtain the configuration to send to the clients during fit()
-        evaluate_fn=get_evaluate_fn(cfg.num_classes, testloader),
+        evaluate_fn=get_evaluate_fn(cfg.num_classes, validationloaders),
+        on_evaluate_config_fn=get_on_evaluate_config(cfg.config_evaluate),
     )  # a function to run on the server side to evaluate the global model.
+
 
     ## 5. Start Simulation
     history = fl.simulation.start_simulation(
@@ -53,14 +52,7 @@ def main(cfg: DictConfig):
     )
 
     ## 6. Save your results
-    # (This is one way of saving results, others are of course valid :) )
-    # Now that the simulation is completed, we could save the results into the directory
-    # that Hydra created automatically at the beginning of the experiment.
     results_path = Path(save_path) / "results.pkl"
-
-    # add the history returned by the strategy into a standard Python dictionary
-    # you can add more content if you wish (note that in the directory created by
-    # Hydra, you'll already have the config used as well as the log)
     results = {"history": history, "anythingelse": "here"}
 
     # save the results as a python pickle

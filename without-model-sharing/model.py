@@ -27,7 +27,7 @@ class Net(nn.Module):
         return x
 
 
-def train(net, trainloader, optimizer, epochs, device: str):
+def train(net, trainloader, epochs, lr):
     """Train the network on the training set."""
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
@@ -43,7 +43,7 @@ def train(net, trainloader, optimizer, epochs, device: str):
     return loss_sum
 
 
-def test(net, testloader, device: str):
+def test(net, testloader):
     """Validate the network on the entire test set."""
     criterion = torch.nn.CrossEntropyLoss()
     correct, total, loss = 0, 0, 0.0

@@ -1,5 +1,6 @@
 __pycache__
 outputs
 data
-results
+results/**/*.log
+results/**/*.pth
 test/.vector_cache

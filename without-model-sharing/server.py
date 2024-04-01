@@ -4,6 +4,8 @@ from collections import OrderedDict
 from omegaconf import DictConfig
 
 import torch
+import time
+import json
 
 from model import Net, test
 
@@ -29,13 +31,32 @@ def get_evaluate_fn(num_classes: int, testloader):
 
         model = Net(num_classes)
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
         params_dict = zip(model.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
         model.load_state_dict(state_dict, strict=True)
-        loss, accuracy = test(model, testloader, device)
+        loss, accuracy = test(model, testloader[server_round])
+
+        try:
+            with open(f'./results/round-3/{server_round}.json', 'w') as json_file:
+                round_data = {
+                    'loss': loss,
+                    'accuracy': accuracy
+                }
+                json.dump(round_data, json_file)
+        except Exception as e:
+            print(e)
         
         return loss, {"accuracy": accuracy}
 
     return evaluate_fn
+
+def get_on_evaluate_config(config: DictConfig):
+    def evaluate_config_fn(server_round: int = 0):
+        print(f'evaluate_config_fn({server_round})')
+        
+        return {
+            "val_steps": config.val_steps,
+            "batch_size": config.batch_size
+        }
+    
+    return evaluate_config_fn

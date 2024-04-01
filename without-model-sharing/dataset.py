@@ -1,61 +1,40 @@
-import torch
-from torch.utils.data import random_split, DataLoader
 import torchvision.transforms as transforms
+from torch.utils.data import DataLoader, Subset
 from torchvision.datasets import CIFAR10
 
 degrees = [0, 270]
 
-def get_mnist(data_path: str = "./data"):
-    """Download MNIST and apply minimal transformation."""
-
+def load_data(user_size):
     transform = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
          transforms.RandomRotation(degrees)]
     )
+    trainset = CIFAR10("./data", train=True, download=True, transform=transform)
+    testset = CIFAR10("./data", train=False, download=True, transform=transform)
 
-    trainset = CIFAR10(data_path, train=True, download=True, transform=transform)
-    testset = CIFAR10(data_path, train=False, download=True, transform=transform)
-
-    return trainset, testset
-
-
-def prepare_dataset(num_partitions: int, batch_size: int, val_ratio: float = 0.1):
-    """Download MNIST and generate IID partitions."""
-
-    # download MNIST in case it's not already in the system
-    trainset, testset = get_mnist()
-
-    # split trainset into `num_partitions` trainsets (one per client)
-    num_images = len(trainset) // num_partitions
-
-    # a list of partition lenghts (all partitions are of equal size)
-    partition_len = [num_images] * num_partitions
-
-    trainsets = random_split(
-        trainset, partition_len, torch.Generator().manual_seed(2023)
-    )
-
-    # create dataloaders with train+val support
     trainloaders = []
-    valloaders = []
-    # for each train set, let's put aside some training examples for validation
-    for trainset_ in trainsets:
-        num_total = len(trainset_)
-        num_val = int(val_ratio * num_total)
-        num_train = num_total - num_val
+    testloaders = []
 
-        for_train, for_val = random_split(
-            trainset_, [num_train, num_val], torch.Generator().manual_seed(2023)
-        )
+    start = 0
+    devices_count = user_size
+    dataset_size = len(trainset) // devices_count
 
-        trainloaders.append(
-            DataLoader(for_train, batch_size=batch_size, shuffle=True, num_workers=2)
-        )
-        valloaders.append(
-            DataLoader(for_val, batch_size=batch_size, shuffle=False, num_workers=2)
-        )
+    for i in range(1, devices_count+1):
+        indices = list(range(start, start+dataset_size))
+        start = start + dataset_size
+        subset = Subset(trainset, indices)
+        trainloader = DataLoader(subset, batch_size=32, shuffle=True)
+        trainloaders.append(trainloader)
 
-    testloader = DataLoader(testset, batch_size=128)
+    start = 0
+    dataset_size = len(testset) // devices_count
 
-    return trainloaders, valloaders, testloader
+    for i in range(1, devices_count+1):
+        indices = list(range(start, start+dataset_size))
+        start = start + dataset_size
+        subset = Subset(testset, indices)
+        testloader = DataLoader(subset, batch_size=32, shuffle=True)
+        testloaders.append(testloader)
+
+    return trainloaders, testloaders

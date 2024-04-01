@@ -4,6 +4,9 @@ from flwr.common import NDArrays, Scalar
 
 import torch
 import flwr as fl
+import json
+import os
+import time
 
 from model import Net, train, test
 
@@ -11,12 +14,13 @@ from model import Net, train, test
 class FlowerClient(fl.client.NumPyClient):
     """Define a Flower Client."""
 
-    def __init__(self, trainloader, vallodaer, num_classes) -> None:
+    def __init__(self, trainloader, vallodaer, num_classes, cid) -> None:
         super().__init__()
 
         # the dataloaders that point to the data associated to this client
         self.trainloader = trainloader
         self.valloader = vallodaer
+        self.cid = cid
 
         # a model that is randomly initialised at first
         self.model = Net(num_classes)
@@ -47,19 +51,29 @@ class FlowerClient(fl.client.NumPyClient):
         self.set_parameters(parameters)
 
         lr = config["lr"]
-        momentum = config["momentum"]
         epochs = config["local_epochs"]
 
-        # a very standard looking optimiser
-        optim = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum)
-
-        train(self.model, self.trainloader, optim, epochs, self.device)
+        train(self.model, self.trainloader, epochs, lr)
         return self.get_parameters({}), len(self.trainloader), {}
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         self.set_parameters(parameters)
 
-        loss, accuracy = test(self.model, self.valloader, self.device)
+        loss, accuracy = test(self.model, self.valloader)
+
+        try:
+            path = f'./results/{self.cid}'
+            print(f'path is {path}')
+            if not os.path.exists(path):
+                os.makedirs(path)
+            with open(f'{path}/{time.time()}.json', 'w') as json_file:
+                round_data = {
+                    'loss': loss,
+                    'accuracy': accuracy
+                }
+                json.dump(round_data, json_file)
+        except Exception as e:
+            print(e)
 
         return float(loss), len(self.valloader), {"accuracy": accuracy}
 
@@ -75,6 +89,7 @@ def generate_client_fn(trainloaders, valloaders, num_classes):
             trainloader=trainloaders[int(cid)],
             vallodaer=valloaders[int(cid)],
             num_classes=num_classes,
+            cid=cid
         ).to_client()
 
     # return the function to spawn client
