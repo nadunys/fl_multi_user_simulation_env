@@ -14,8 +14,8 @@ def get_mnist(data_path: str = "./data"):
          transforms.RandomRotation(degrees)]
     )
 
-    trainset = CIFAR10(data_path, train=True, download=True, transform=tr)
-    testset = CIFAR10(data_path, train=False, download=True, transform=tr)
+    trainset = CIFAR10(data_path, train=True, download=True, transform=transform)
+    testset = CIFAR10(data_path, train=False, download=True, transform=transform)
 
     return trainset, testset
 
