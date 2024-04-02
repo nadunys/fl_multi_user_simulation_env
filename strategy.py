@@ -7,7 +7,7 @@ from flwr.server.client_proxy import ClientProxy
 
 from init_devices import get_device_parameters
 from device_selection import Device, compute_metrics, select_devices_UAC
-from models.cifar import Net
+from models.mnist import Net
 from client import get_user_parameters, load_model, save_model, set_user_model_params
 
 from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays, ndarrays_to_parameters
@@ -218,11 +218,13 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             
             # accuracy of each client
             accuracies = [r.metrics["accuracy"] * r.num_examples for _, r in results]
+            f1_score = [r.metrics["f1_score"] * r.num_examples for _, r in results]
             examples = [r.num_examples for _, r in results]
             losses = [r.loss for _, r in results]
 
             # Aggregate and print custom metric
             accuracy_aggregated = sum(accuracies) / sum(examples)
+            f1_score_aggregated = sum(f1_score) / sum(examples)
             loss_aggregated = np.mean(losses)
             print(f"Round {server_round} accuracy aggregated from client results: {accuracy_aggregated}")
 
@@ -273,6 +275,7 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         'rnd': server_round,
                         'global_loss': loss_aggregated,
                         'global_accuracy': accuracy_aggregated,
+                        'f1_score': f1_score_aggregated,
                         'global_accuracies': accuracies,
                         'global_examples': examples,
                         'user_loss': user_loss_agg,

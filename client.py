@@ -7,7 +7,7 @@ import flwr as fl
 import copy
 import os
 
-from models.cifar import Net, train, test
+from models.mnist import Net, train, test
 
 USER_MODEL_PATH = 'results/user/'
 GLOBAL_MODEL_PATH = 'results/global'
@@ -34,9 +34,9 @@ class FlowerClient(fl.client.NumPyClient):
         self.user_model_path = f'{USER_MODEL_PATH}{user_id}'
         self.global_model_path = f'{GLOBAL_MODEL_PATH}'
 
-        # user_model = load_model(Net(), self.user_model_path)
-        # if user_model is not None:
-        #     self.model = copy.deepcopy(user_model)
+        user_model = load_model(Net(), self.user_model_path)
+        if user_model is not None:
+            self.model = copy.deepcopy(user_model)
         
         print(f'Initialized flower client {user_id}')
 
@@ -93,18 +93,19 @@ class FlowerClient(fl.client.NumPyClient):
             print(f'starting client evaluate {config}')
             self.set_parameters(parameters)
             print('self params set')
-            loss, accuracy = test(self.model, self.valloader)
+            loss, accuracy, f1_score = test(self.model, self.valloader)
             print(f'loss: {loss} accuracy: {accuracy} after calling test')
-            user_loss, user_accuracy = loss, accuracy
-            device_loss, device_accuracy = loss, accuracy
+            user_loss, user_accuracy, user_f1_score = loss, accuracy, f1_score
+            device_loss, device_accuracy, device_f1_score = loss, accuracy, f1_score
 
             user_model = load_model(Net(), self.user_model_path)
             if user_model is not None:
                 set_user_model_params(user_model, parameters)
-                user_loss, user_accuracy = test(user_model, self.valloader)
+                user_loss, user_accuracy, user_f1_score = test(user_model, self.valloader)
             return loss, len(self.valloader), {"accuracy": accuracy, "user": self.user,
                                             "user_accuracy": user_accuracy, "user_loss": user_loss,
-                                            "device_accuracy": device_accuracy, "device_loss": device_loss}
+                                            "device_accuracy": device_accuracy, "device_loss": device_loss,
+                                            "f1_score": f1_score, "user_f1_score": user_f1_score, "device_f1_score": device_f1_score}
         except Exception as e:
             print('Something wrong with client evaluation')
             print(e)        

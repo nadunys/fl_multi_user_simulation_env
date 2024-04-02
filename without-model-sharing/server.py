@@ -34,13 +34,14 @@ def get_evaluate_fn(num_classes: int, testloader):
         params_dict = zip(model.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
         model.load_state_dict(state_dict, strict=True)
-        loss, accuracy = test(model, testloader[server_round])
+        loss, accuracy, f1 = test(model, testloader[server_round])
 
         try:
-            with open(f'./results/{server_round}.json', 'w') as json_file:
+            with open(f'./results/100-clients/{server_round}.json', 'w') as json_file:
                 round_data = {
                     'loss': loss,
-                    'accuracy': accuracy
+                    'accuracy': accuracy,
+                    'f1_score': f1
                 }
                 json.dump(round_data, json_file)
         except Exception as e:

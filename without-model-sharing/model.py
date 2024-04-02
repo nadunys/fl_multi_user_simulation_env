@@ -1,13 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import f1_score
 
 # Note the model and functions here defined do not have any FL-specific components.
 
 
 class Net(nn.Module):
-    """A simple CNN suitable for simple vision tasks."""
-
     def __init__(self, num_classes: int) -> None:
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
@@ -34,7 +33,6 @@ def train(net, trainloader, epochs, lr):
     loss_sum = 0
     for _ in range(epochs):
         for images, labels in trainloader:
-            # images, labels = images.to(DEVICE), labels.to(DEVICE)
             optimizer.zero_grad()
             loss = criterion(net(images), labels)
             loss_sum += loss.item()
@@ -47,6 +45,8 @@ def test(net, testloader):
     """Validate the network on the entire test set."""
     criterion = torch.nn.CrossEntropyLoss()
     correct, total, loss = 0, 0, 0.0
+    f1 = 0
+    i = 0
     with torch.no_grad():
         for images, labels in testloader:
             # images, labels = data[0].to(DEVICE), data[1].to(DEVICE)
@@ -55,5 +55,8 @@ def test(net, testloader):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            f1 += f1_score(predicted, labels, average='macro')
+            i += 1
     accuracy = correct / total
-    return loss, accuracy
+    f1 = f1 / i
+    return loss, accuracy, f1

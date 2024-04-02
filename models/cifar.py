@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import f1_score
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -30,7 +31,6 @@ def train(net, trainloader, epochs, lr):
     loss_sum = 0
     for _ in range(epochs):
         for images, labels in trainloader:
-            # images, labels = images.to(DEVICE), labels.to(DEVICE)
             optimizer.zero_grad()
             loss = criterion(net(images), labels)
             loss_sum += loss.item()
@@ -42,14 +42,15 @@ def test(net, testloader):
     """Validate the network on the entire test set."""
     criterion = torch.nn.CrossEntropyLoss()
     correct, total, loss = 0, 0, 0.0
+    f1 = 0
     with torch.no_grad():
         for images, labels in testloader:
-            # images, labels = data[0].to(DEVICE), data[1].to(DEVICE)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            f1 += f1_score(predicted, labels, average='macro')
     accuracy = correct / total
-    return loss, accuracy
+    return loss, accuracy, f1
 
