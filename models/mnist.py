@@ -45,15 +45,20 @@ def test(net, testloader):
     """Validate the network on the entire test set."""
     criterion = torch.nn.CrossEntropyLoss()
     correct, total, loss = 0, 0, 0.0
-    f1 = 0
+    predictions = []
+    lbls = []
     with torch.no_grad():
         for images, labels in testloader:
+            lbls += labels
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            f1 += f1_score(predicted, labels, average='macro')
+            
+            for output in outputs:
+                predictions.append(torch.argmax(output))
     accuracy = correct / total
+    f1 = f1_score(predictions, lbls, average='macro')
     return loss, accuracy, f1
 
