@@ -36,8 +36,8 @@ def main(cfg: DictConfig):
     ## 4. Define your strategy
     avalible_clients = cfg.num_clients * cfg.num_devices_per_client
     strategy = PersonalizationStrategy(
-        fraction_fit=1.0,  # in simulation, since all clients are available at all times, we can just use `min_fit_clients` to control exactly how many clients we want to involve during fit
-        fraction_evaluate=1.0,  # similar to fraction_fit, we don't need to use this argument.
+        fraction_fit=1.0,  
+        fraction_evaluate=1.0,
         min_fit_clients=cfg.num_clients_per_round_fit,  # number of clients to sample for fit()
         min_evaluate_clients=cfg.num_clients_per_round_eval,  # number of clients to sample for evaluate()
         min_available_clients=avalible_clients,  # total clients in the simulation

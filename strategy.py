@@ -45,6 +45,9 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
             initial_parameters = None,
             num_clients: int = 105,
     ) -> None:
+        '''
+        Initializes the personalization strategy
+        '''
         super().__init__(
             fraction_fit=fraction_fit,
             fraction_evaluate=fraction_evaluate,
@@ -104,18 +107,15 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                     return []
                 
                 # Sample clients
-                msg = "Round %s, sample %s clients (based on device selection criteria)"
-                log(DEBUG, msg, str(server_round), str(sample_size))
                 all_clients = client_manager.all()
                 cid_idx: Dict[int, str] = {}
                 for idx, (cid, _) in enumerate(all_clients.items()):
                     cid_idx[idx] = cid
-                    # print("All clients cid: {}, idx: {}".format(cid, idx))
+                    print(f"All clients cid: {cid}, idx: {idx}")
 
                 global CURR_ROUND
                 CURR_ROUND = server_round
                 if server_round == 1:
-                    # sampled_indices = select_devices(rnd, devices=self.devices, strategy='random')
                     sampled_indices = [*range(len(all_clients))]
                 else:
                     num_device_per_user = len(devices_list)
@@ -165,39 +165,37 @@ class PersonalizationStrategy(fl.server.strategy.FedAvg):
                         self.devices[int(client.cid)].update_loss(r.metrics['loss'])
                         global_weights_results.append((parameters_to_ndarrays(r.parameters), r.num_examples))
 
-            if user_model_path != 'no_personal' and user_model_path != 'local_finetuning':
-                user_model = Net()
+            user_model = Net()
+            devices = devices_list
+            num_users = int(num_clients / len(devices))
 
-                devices = devices_list
-                num_users = int(num_clients / len(devices))
+            print(f'Devices: {devices}')
+            print(f'Num users: {num_users}')
 
-                print(f'Devices: {devices}')
-                print(f'Num users: {num_users}')
-
-                for user in range(num_users):
-                    device_params = []
-                    for device_idx, device in enumerate(devices):
-                        cid = user * len(devices) + device_idx
-                        if cid in self.sampled_indices:
-                            try:
-                                # user load model
-                                user_model_x = load_model(user_model, f'results/user/{user}')
-                                user_params = get_user_parameters(user_model_x)
-                                device_params.append((user_params, 10))
-                                print(f'User: {user}, Device: {device}')
-
-                            except Exception as e:
-                                print('User device weights not found')
-                            
-                    if len(device_params) > 0:
+            for user in range(num_users):
+                device_params = []
+                for device_idx, device in enumerate(devices):
+                    cid = user * len(devices) + device_idx
+                    if cid in self.sampled_indices:
                         try:
-                            user_params = aggregate(device_params)
-                            user_model = Net()
-                            set_user_model_params(user_model, user_params)
-                            save_model(user_model, f'results/user/{user}')
-                            print(f'Fit user model weights: {user}')
+                            # load user model
+                            user_model_x = load_model(user_model, f'results/user/{user}')
+                            user_params = get_user_parameters(user_model_x)
+                            device_params.append((user_params, 10))
+                            print(f'User: {user}, Device: {device}')
+
                         except Exception as e:
-                            print(f'User model not found: {user}')
+                            print('User device weights not found')
+                        
+                if len(device_params) > 0:
+                    try:
+                        user_params = aggregate(device_params)
+                        user_model = Net()
+                        set_user_model_params(user_model, user_params)
+                        save_model(user_model, f'results/user/{user}')
+                        print(f'Fit user model weights: {user}')
+                    except Exception as e:
+                        print(f'User model not found: {user}')
             global_weights_prime = aggregate(global_weights_results)
             return ndarrays_to_parameters(global_weights_prime), {}
                 
