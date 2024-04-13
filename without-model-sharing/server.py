@@ -37,11 +37,12 @@ def get_evaluate_fn(num_classes: int, testloader):
         loss, accuracy, f1 = test(model, testloader[server_round])
 
         try:
-            with open(f'./results/100-clients/{server_round}.json', 'w') as json_file:
-                round_data = {
-                    'loss': loss,
-                    'accuracy': accuracy,
-                    'f1_score': f1
+            with open(f'./../results/mnist-presentation-normal/{server_round}.json', 'w') as json_file:
+                round_data = { 
+                    'global_loss': loss,
+                    'global_accuracy': accuracy,
+                    'f1_score': f1,
+                    'rnd': server_round
                 }
                 json.dump(round_data, json_file)
         except Exception as e:

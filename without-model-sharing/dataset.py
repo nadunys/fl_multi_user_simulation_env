@@ -1,17 +1,17 @@
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Subset
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import MNIST
 
 degrees = [0, 270]
 
 def load_data(user_size):
     transform = transforms.Compose(
         [transforms.ToTensor(),
-         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+         transforms.Normalize((0.1307,), (0.3081,)),
          transforms.RandomRotation(degrees)]
     )
-    trainset = CIFAR10("./data", train=True, download=True, transform=transform)
-    testset = CIFAR10("./data", train=False, download=True, transform=transform)
+    trainset = MNIST("./data", train=True, download=True, transform=transform)
+    testset = MNIST("./data", train=False, download=True, transform=transform)
 
     trainloaders = []
     testloaders = []

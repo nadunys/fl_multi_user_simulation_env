@@ -4,9 +4,6 @@ from flwr.common import NDArrays, Scalar
 
 import torch
 import flwr as fl
-import json
-import os
-import time
 
 from model import Net, train, test
 
@@ -58,23 +55,7 @@ class FlowerClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters: NDArrays, config: Dict[str, Scalar]):
         self.set_parameters(parameters)
-
         loss, accuracy = test(self.model, self.valloader)
-
-        try:
-            path = f'./results/{self.cid}'
-            print(f'path is {path}')
-            if not os.path.exists(path):
-                os.makedirs(path)
-            with open(f'{path}/{time.time()}.json', 'w') as json_file:
-                round_data = {
-                    'loss': loss,
-                    'accuracy': accuracy
-                }
-                json.dump(round_data, json_file)
-        except Exception as e:
-            print(e)
-
         return float(loss), len(self.valloader), {"accuracy": accuracy}
 
 
