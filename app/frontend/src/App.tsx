@@ -1,15 +1,11 @@
 import {
-  CButton,
   CCol,
-  CListGroup,
-  CListGroupItem,
   CNavItem,
   CRow,
   CSidebar,
   CSidebarBrand,
   CSidebarHeader,
-  CSidebarNav,
-  CSidebarToggler,
+  CSidebarNav
 } from "@coreui/react";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import "./App.css";

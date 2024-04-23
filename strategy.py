@@ -7,7 +7,7 @@ from flwr.server.client_proxy import ClientProxy
 
 from init_devices import get_device_parameters
 from device_selection import Device, compute_metrics, select_devices_UAC
-from models.cifar import Net
+from models.mnist import Net
 from client import get_user_parameters, load_model, save_model, set_user_model_params
 
 from flwr.common import EvaluateRes, FitRes, Parameters, FitIns, Scalar, parameters_to_ndarrays, ndarrays_to_parameters

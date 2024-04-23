@@ -7,7 +7,7 @@ from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
 
-from datatests.cifar import load_data
+from datatests.mnist import load_data
 from client import generate_client_fn
 from server import get_on_fit_config, get_on_evaluate_config
 from strategy import PersonalizationStrategy

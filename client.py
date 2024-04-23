@@ -7,7 +7,7 @@ import flwr as fl
 import copy
 import os
 
-from models.cifar import Net, train, test
+from models.mnist import Net, train, test
 
 USER_MODEL_PATH = 'results/user/'
 GLOBAL_MODEL_PATH = 'results/global'
