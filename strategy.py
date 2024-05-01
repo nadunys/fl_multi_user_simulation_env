@@ -16,7 +16,7 @@ from logging import DEBUG, INFO
 from flwr.common.logger import log
 from flwr.server.strategy.aggregate import aggregate
 
-devices_list = ['laptop', 'mobile_phone', 'smart_watch']
+devices_list = ['laptop', 'mobile_phone', 'smart_watch', 'tab']
 user_list = set()
 device_selection = "stat"
 sample_device_per = 0.5
